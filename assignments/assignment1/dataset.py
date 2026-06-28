@@ -14,9 +14,9 @@ def load_data_mat(filename, max_samples, seed=42):
     raw = io.loadmat(filename)
     X = raw['X']  # Array of [32, 32, 3, n_samples]
     y = raw['y']  # Array of [n_samples, 1]
-    X = np.moveaxis(X, [3], [0])
-    y = y.flatten()
-    # Fix up class 0 to be 0
+    X = np.moveaxis(X, [3], [0]) # Array of [n_samples, 32, 32, 3]
+    y = y.flatten() # Array of [n_samples,]
+    # Fix up class 0 to be 0 because '0' has label 10
     y[y == 10] = 0
 
     np.random.seed(seed)
