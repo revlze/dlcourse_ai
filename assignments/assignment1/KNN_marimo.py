@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.11"
+__generated_with = "0.23.9"
 app = marimo.App()
 
 
@@ -76,16 +76,23 @@ def _(load_svhn):
 
 
 @app.cell
+def _(train_y):
+    train_y.shape
+    return
+
+
+@app.cell
 def _(np, plt, train_X, train_y):
     samples_per_class = 5  # Number of samples per class to visualize
     plot_index = 1
     for example_index in range(samples_per_class):
         for class_index in range(10):
-            plt.subplot(5, 10, plot_index)
+            plt.subplot(samples_per_class, 10, plot_index)
             image = train_X[train_y == class_index][example_index]
             plt.imshow(image.astype(np.uint8))
             plt.axis('off')
             plot_index = plot_index + 1
+    plt.show()
     return
 
 
@@ -106,13 +113,14 @@ def _(test_X, test_y, train_X, train_y):
     # Only select 0s and 9s
     binary_train_mask = (train_y == 0) | (train_y == 9)
     binary_train_X = train_X[binary_train_mask]
-    binary_train_y = train_y[binary_train_mask] == 0
+    binary_train_y = train_y[binary_train_mask] == 0 # 0 — True, 9 - False
 
     binary_test_mask = (test_y == 0) | (test_y == 9)
     binary_test_X = test_X[binary_test_mask]
     binary_test_y = test_y[binary_test_mask] == 0
 
-    # Reshape to 1-dimensional array [num_samples, 32*32*3]
+    # Reshape to 1-dimensional array [num_samples, 32*32*3],
+    # left num_samples, but every image convert to one number
     binary_train_X = binary_train_X.reshape(binary_train_X.shape[0], -1)
     binary_test_X = binary_test_X.reshape(binary_test_X.shape[0], -1)
     return binary_test_X, binary_test_y, binary_train_X, binary_train_y
@@ -140,8 +148,14 @@ def _(mo):
 
     **Обратите внимание** Для простоты реализации мы будем использовать в качестве расстояния меру L1 (ее еще называют [Manhattan distance](https://ru.wikipedia.org/wiki/%D0%A0%D0%B0%D1%81%D1%81%D1%82%D0%BE%D1%8F%D0%BD%D0%B8%D0%B5_%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D1%81%D0%BA%D0%B8%D1%85_%D0%BA%D0%B2%D0%B0%D1%80%D1%82%D0%B0%D0%BB%D0%BE%D0%B2)).
 
-    ![image.png](attachment:image.png)
+    ![image.png](image.png)
     """)
+    return
+
+
+@app.cell
+def _(binary_test_X):
+    binary_test_X[:, None,:]
     return
 
 
@@ -150,6 +164,7 @@ def _(binary_test_X, binary_train_X, knn_classifier, np):
     # TODO: implement compute_distances_two_loops in knn.py
     _dists = knn_classifier.compute_distances_two_loops(binary_test_X)
     assert np.isclose(_dists[0, 10], np.sum(np.abs(binary_test_X[0] - binary_train_X[10])))
+    _dists
     return
 
 
@@ -158,6 +173,7 @@ def _(binary_test_X, binary_train_X, knn_classifier, np):
     # TODO: implement compute_distances_one_loop in knn.py
     _dists = knn_classifier.compute_distances_one_loop(binary_test_X)
     assert np.isclose(_dists[0, 10], np.sum(np.abs(binary_test_X[0] - binary_train_X[10])))
+    _dists
     return
 
 
@@ -166,25 +182,15 @@ def _(binary_test_X, binary_train_X, knn_classifier, np):
     # TODO: implement compute_distances_no_loops in knn.py
     _dists = knn_classifier.compute_distances_no_loops(binary_test_X)
     assert np.isclose(_dists[0, 10], np.sum(np.abs(binary_test_X[0] - binary_train_X[10])))
+    _dists
     return
 
 
 @app.cell
-def _():
-    # Lets look at the performance difference
-    # magic command not supported in marimo; please file an issue to add support
-    # %timeit knn_classifier.compute_distances_two_loops(binary_test_X)
-    # magic command not supported in marimo; please file an issue to add support
-    # %timeit knn_classifier.compute_distances_one_loop(binary_test_X)
-    # magic command not supported in marimo; please file an issue to add support
-    # %timeit knn_classifier.compute_distances_no_loops(binary_test_X)
-    return
-
-
-@app.cell
-def _(binary_test_X, knn_classifier):
+def _(binary_test_X, binary_test_y, knn_classifier):
     # TODO: implement predict_labels_binary in knn.py
     prediction = knn_classifier.predict(binary_test_X)
+    prediction, binary_test_y, "True - 0 class, False - 9 class"
     return (prediction,)
 
 
@@ -238,19 +244,47 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(KNN, binary_classification_metrics, binary_train_X, binary_train_y, np):
     # Find the best k using cross-validation based on F1 score
     _num_folds = 5
     _train_folds_X = []
     _train_folds_y = []
-    _k_choices = [1, 2, 3, 5, 8, 10, 15, 20, 25, 50]
+    _knn_k_choices = [1, 2, 3, 5, 8, 10, 15, 20, 25, 50]
     # TODO: split the training data in 5 folds and store them in train_folds_X/train_folds_y
+    rng = np.random.default_rng(42)
+    inds = rng.permutation(binary_train_X.shape[0])
+    shuffled_binary_train_X = binary_train_X[inds]
+    shuffled_binary_train_y = binary_train_y[inds]
+    _train_folds_X = np.array_split(shuffled_binary_train_X, _num_folds)
+    _train_folds_y = np.array_split(shuffled_binary_train_y, _num_folds)
+
     k_to_f1 = {}
-    for _k in _k_choices:
-        pass  # dict mapping k values to mean F1 scores (int -> float)
+    for _k in _knn_k_choices:
+        # TODO: perform cross-validation  
+        # Go through every fold and use it for testing and all other folds for training
+        # Perform training and produce F1 score metric on the validation dataset
+        # Average F1 from all the folds and write it into k_to_f1
+        # dict mapping k values to mean F1 scores (int -> float)
+        sum_f1 = 0.
+        for _fold_i in range(_num_folds):
+            _val_X = _train_folds_X[_fold_i]
+            _val_y = _train_folds_y[_fold_i]
+            _train_X_cv = np.concatenate(
+                [_train_folds_X[i] for i in range(_num_folds) if i != _fold_i]
+            )
+            _train_y_cv = np.concatenate(
+                [_train_folds_y[i] for i in range(_num_folds) if i != _fold_i]
+            )
+            _knn_classifier_k = KNN(k=_k)
+            _knn_classifier_k.fit(_train_X_cv, _train_y_cv)
+            predict_k = _knn_classifier_k.predict(_val_X)
+            _,_,f1,_ = binary_classification_metrics(predict_k, _val_y)
+            sum_f1 += f1
+        k_to_f1[_k] = sum_f1 / _num_folds 
+
     for _k in sorted(k_to_f1):
-        print('k = %d, f1 = %f' % (_k, k_to_f1[_k]))  # TODO: perform cross-validation  # Go through every fold and use it for testing and all other folds for training  # Perform training and produce F1 score metric on the validation dataset  # Average F1 from all the folds and write it into k_to_f1
-    return
+        print('k = %d, f1 = %f' % (_k, k_to_f1[_k]))  
+    return (k_to_f1,)
 
 
 @app.cell(hide_code=True)
@@ -269,8 +303,11 @@ def _(
     binary_test_y,
     binary_train_X,
     binary_train_y,
+    k_to_f1,
 ):
-    _best_k = 1
+    # TODO Set the best k as a best from computed
+    _max_f1 = max(k_to_f1.values())
+    _best_k = [i for i in k_to_f1 if k_to_f1[i] == _max_f1][0]
     _best_knn_classifier = KNN(k=_best_k)
     _best_knn_classifier.fit(binary_train_X, binary_train_y)
     prediction_2 = _best_knn_classifier.predict(binary_test_X)
@@ -301,16 +338,17 @@ def _(KNN, test_X, train_X, train_y):
 
 
 @app.cell
-def _(knn_classifier_1, test_X_1):
+def _(knn_classifier_1, test_X_1, test_y):
     # TODO: Implement predict_labels_multiclass
-    predict = knn_classifier_1.predict(test_X_1)
-    return (predict,)
+    predict_1 = knn_classifier_1.predict(test_X_1)
+    predict_1, test_y
+    return (predict_1,)
 
 
 @app.cell
-def _(multiclass_accuracy, predict, test_y):
+def _(multiclass_accuracy, predict_1, test_y):
     # TODO: Implement multiclass_accuracy
-    _accuracy = multiclass_accuracy(predict, test_y)
+    _accuracy = multiclass_accuracy(predict_1, test_y)
     print('Accuracy: %4.2f' % _accuracy)
     return
 
@@ -324,19 +362,44 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(KNN, multiclass_accuracy, np, train_X_1, train_y):
     # Find the best k using cross-validation based on accuracy
     _num_folds = 5
     _train_folds_X = []
     _train_folds_y = []
-    _k_choices = [1, 2, 3, 5, 8, 10, 15, 20, 25, 50]
+    _knn_k_choices = [1, 2, 3, 5, 8, 10, 15, 20, 25, 50]
     # TODO: split the training data in 5 folds and store them in train_folds_X/train_folds_y
+    _rng = np.random.default_rng(41)
+    indicies = _rng.permutation(train_X_1.shape[0])
+    shuffled_train_X = train_X_1[indicies]
+    shuffled_train_y = train_y[indicies]
+    _train_folds_X = np.array_split(shuffled_train_X, _num_folds)
+    _train_folds_y = np.array_split(shuffled_train_y, _num_folds)
+
+
     k_to_accuracy = {}
-    for _k in _k_choices:
-        pass
+    for _k in _knn_k_choices:
+        sum_accuracy = 0.
+        for _fold_i in range(_num_folds):
+            val_X = _train_folds_X[_fold_i]
+            val_y = _train_folds_y[_fold_i]
+
+            train_X_cv = np.concatenate(
+                [_train_folds_X[i] for i in range(_num_folds) if i != _fold_i]
+            )
+            train_y_cv = np.concatenate(
+                [_train_folds_y[i] for i in range(_num_folds) if i != _fold_i]
+            )
+            _knn_classifier_k = KNN(k=_k)
+            _knn_classifier_k.fit(train_X_cv, train_y_cv)
+            _predict = _knn_classifier_k.predict(val_X)
+            sum_accuracy += multiclass_accuracy(_predict, val_y)
+        k_to_accuracy[_k] = sum_accuracy / _num_folds
+        
+
     for _k in sorted(k_to_accuracy):
         print('k = %d, accuracy = %f' % (_k, k_to_accuracy[_k]))  # TODO: perform cross-validation  # Go through every fold and use it for testing and all other folds for validation  # Perform training and produce accuracy metric on the validation dataset  # Average accuracy from all the folds and write it into k_to_accuracy
-    return
+    return (k_to_accuracy,)
 
 
 @app.cell(hide_code=True)
@@ -350,12 +413,23 @@ def _(mo):
 
 
 @app.cell
-def _(KNN, multiclass_accuracy, test_X_1, test_y, train_X_1, train_y):
-    _best_k = 1
+def _(
+    KNN,
+    k_to_accuracy,
+    multiclass_accuracy,
+    test_X_1,
+    test_y,
+    train_X_1,
+    train_y,
+):
+    # TODO Set the best k as a best from computed
+    _max_accuracy = max(k_to_accuracy.values())
+    _best_k = [i for i in k_to_accuracy if k_to_accuracy[i] == _max_accuracy][0]
     _best_knn_classifier = KNN(k=_best_k)
     _best_knn_classifier.fit(train_X_1, train_y)
     prediction_3 = _best_knn_classifier.predict(test_X_1)
     _accuracy = multiclass_accuracy(prediction_3, test_y)
+    print('Best KNN with k = %s' % _best_k)
     print('Accuracy: %4.2f' % _accuracy)
     return
 
