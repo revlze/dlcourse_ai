@@ -73,8 +73,8 @@ def _(mo):
 @app.cell
 def _(load_svhn, np, random_split_train_val):
     def prepare_for_linear_classifier(train_X, test_X):
-        train_flat = train_X.reshape(train_X.shape[0], -1).astype(np.float) / 255.0
-        test_flat = test_X.reshape(test_X.shape[0], -1).astype(np.float) / 255.0
+        train_flat = train_X.reshape(train_X.shape[0], -1).astype(np.float64) / 255.0
+        test_flat = test_X.reshape(test_X.shape[0], -1).astype(np.float64) / 255.0
 
         # Subtract mean
         mean_image = np.mean(train_flat, axis = 0)
@@ -86,11 +86,17 @@ def _(load_svhn, np, random_split_train_val):
         test_flat_with_ones = np.hstack([test_flat, np.ones((test_X.shape[0], 1))])    
         return train_flat_with_ones, test_flat_with_ones
 
-    train_X, train_y, test_X, test_y = load_svhn("data", max_train=10000, max_test=1000)    
-    train_X, test_X = prepare_for_linear_classifier(train_X, test_X)
+    full_train_X, full_train_y, test_X, test_y = load_svhn("data", max_train=10000, max_test=1000)    
+    full_train_X, test_X = prepare_for_linear_classifier(full_train_X, test_X)
     # Split train into train and val
-    train_X, train_y, val_X, val_y = random_split_train_val(train_X, train_y, num_val = 1000)
+    train_X, train_y, val_X, val_y = random_split_train_val(full_train_X, full_train_y, num_val = 1000)
     return test_X, test_y, train_X, train_y, val_X, val_y
+
+
+@app.cell
+def _(train_y):
+    type(train_y)
+    return
 
 
 @app.cell(hide_code=True)
@@ -101,7 +107,7 @@ def _(mo):
     В этом курсе мы будем писать много функций, которые вычисляют градиенты аналитическим методом.
 
     Все функции, в которых мы будем вычислять градиенты, будут написаны по одной и той же схеме.
-    Они будут получать на вход точку, где нужно вычислить значение и градиент функции, а на выходе будут выдавать кортеж (tuple) из двух значений - собственно значения функции в этой точке (всегда одно число) и аналитического значения градиента в той же точке (той же размерности, что и вход).
+    Они будут получать на вход точку, где нужно вычислить значение и градиент функции, а на выходе будут выдавать кортеж (tuple) из двух значений - собственно, значения функции в этой точке (всегда одно число) и аналитического значения градиента в той же точке (той же размерности, что и вход).
     ```
     def f(x):
         \"\"\"
@@ -137,21 +143,21 @@ def _(check_gradient, np):
     # All the functions below should pass the gradient check
 
     def square(x):
-        return float(x*x), 2*x
+        return np.sum(x*x), 2*x
 
-    check_gradient(square, np.array([3.0]))
+    print(check_gradient(square, np.array([3.0])))
 
     def array_sum(x):
         assert x.shape == (2,), x.shape
         return np.sum(x), np.ones_like(x)
 
-    check_gradient(array_sum, np.array([3.0, 2.0]))
+    print(check_gradient(array_sum, np.array([3.0, 2.0])))
 
     def array_2d_sum(x):
         assert x.shape == (2,2)
         return np.sum(x), np.ones_like(x)
 
-    check_gradient(array_2d_sum, np.array([[3.0, 2.0], [1.0, 0.0]]))
+    print(check_gradient(array_2d_sum, np.array([[3.0, 2.0], [1.0, 0.0]])))
     return
 
 
@@ -222,7 +228,7 @@ def _(mo):
 def _(check_gradient, linear_classifer, np):
     # TODO Implement combined function or softmax and cross entropy and produces gradient
     _loss, grad = linear_classifer.softmax_with_cross_entropy(np.array([1, 0, 0]), 1)
-    check_gradient(lambda x: linear_classifer.softmax_with_cross_entropy(x, 1), np.array([1, 0, 0], np.float))
+    check_gradient(lambda x: linear_classifer.softmax_with_cross_entropy(x, 1), np.array([1, 0, 0], np.float64))
     return
 
 
@@ -247,14 +253,16 @@ def _(check_gradient, linear_classifer, np):
     # Test batch_size = 1
     _num_classes = 4
     _batch_size = 1
-    predictions = np.random.randint(-1, 3, size=(_batch_size, _num_classes)).astype(np.float)
-    _target_index = np.random.randint(0, _num_classes, size=(_batch_size, 1)).astype(np.int)
+    predictions = np.random.randint(-1, 3, size=(_batch_size, _num_classes)).astype(np.float64)
+    _target_index = np.random.randint(0, _num_classes, size=(_batch_size, 1)).astype(np.int_)
     check_gradient(lambda x: linear_classifer.softmax_with_cross_entropy(x, _target_index), predictions)
-    _num_classes = 4
+
+
     # Test batch_size = 3
+    _num_classes = 4
     _batch_size = 3
-    predictions = np.random.randint(-1, 3, size=(_batch_size, _num_classes)).astype(np.float)
-    _target_index = np.random.randint(0, _num_classes, size=(_batch_size, 1)).astype(np.int)
+    predictions = np.random.randint(-1, 3, size=(_batch_size, _num_classes)).astype(np.float64)
+    _target_index = np.random.randint(0, _num_classes, size=(_batch_size, 1)).astype(np.int_)
     check_gradient(lambda x: linear_classifer.softmax_with_cross_entropy(x, _target_index), predictions)
     _probs = linear_classifer.softmax(np.array([[20, 0, 0], [1000, 0, 0]]))
     # Make sure maximum subtraction for numberic stability is done separately for every sample in the batch
@@ -287,10 +295,11 @@ def _(check_gradient, linear_classifer, np):
     _num_classes = 2
     num_features = 3
     np.random.seed(42)
-    W = np.random.randint(-1, 3, size=(num_features, _num_classes)).astype(np.float)
-    X = np.random.randint(-1, 3, size=(_batch_size, num_features)).astype(np.float)
-    _target_index = np.ones(_batch_size, dtype=np.int)
+    W = np.random.randint(-1, 3, size=(num_features, _num_classes)).astype(np.float64)
+    X = np.random.randint(-1, 3, size=(_batch_size, num_features)).astype(np.float64)
+    _target_index = np.ones(_batch_size, dtype=np.int_)
     _loss, dW = linear_classifer.linear_softmax(X, W, _target_index)
+    # print(dW.shape)
     check_gradient(lambda w: linear_classifer.linear_softmax(X, w, _target_index), W)
     return (W,)
 
@@ -339,29 +348,39 @@ def _(mo):
 def _(linear_classifer, train_X, train_y):
     # TODO: Implement LinearSoftmaxClassifier.fit function
     classifier = linear_classifer.LinearSoftmaxClassifier()
-    loss_history = classifier.fit(train_X, train_y, epochs=10, learning_rate=1e-3, batch_size=300, reg=1e1)
-    return classifier, loss_history
+    loss_history_1 = classifier.fit(train_X, train_y, epochs=10, learning_rate=1e-3, batch_size=300, reg=1e1)
+    return classifier, loss_history_1
 
 
 @app.cell
-def _(loss_history, plt):
+def _(loss_history_1, plt):
     # let's look at the loss history!
-    plt.plot(loss_history)
+    plt.plot(loss_history_1)
+    return
+
+
+@app.cell
+def _(classifier, multiclass_accuracy, val_X, val_y):
+    # Let's check how it performs on validation set
+    pred_1 = classifier.predict(val_X)
+    accuracy_1 = multiclass_accuracy(pred_1, val_y)
+    print("Accuracy: ", accuracy_1)
     return
 
 
 @app.cell
 def _(classifier, multiclass_accuracy, train_X, train_y, val_X, val_y):
-    # Let's check how it performs on validation set
-    pred = classifier.predict(val_X)
-    accuracy = multiclass_accuracy(pred, val_y)
-    print("Accuracy: ", accuracy)
-
     # Now, let's train more and see if it performs better
-    classifier.fit(train_X, train_y, epochs=100, learning_rate=1e-3, batch_size=300, reg=1e1)
-    pred = classifier.predict(val_X)
-    accuracy = multiclass_accuracy(pred, val_y)
-    print("Accuracy after training for 100 epochs: ", accuracy)
+    loss_history_2 = classifier.fit(train_X, train_y, epochs=100, learning_rate=1e-6, batch_size=300, reg=1e-1)
+    pred_2 = classifier.predict(val_X)
+    accuracy_2 = multiclass_accuracy(pred_2, val_y)
+    print("Accuracy after training for 100 epochs: ", accuracy_2)
+    return (loss_history_2,)
+
+
+@app.cell
+def _(loss_history_2, plt):
+    plt.plot(loss_history_2)
     return
 
 
@@ -379,18 +398,35 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(linear_classifer, multiclass_accuracy, train_X, train_y, val_X, val_y):
     num_epochs = 200
     _batch_size = 300
-    learning_rates = [0.001, 0.0001, 1e-05]
-    reg_strengths = [0.0001, 1e-05, 1e-06]
+    learning_rates = [1e-2, 1e-3, 1e-4, 1e-05, 1e-06]
+    reg_strengths = [1e-3, 1e-4, 1e-05, 1e-06]
     best_classifier = None
     best_val_accuracy = None
     # TODO use validation set to find the best hyperparameters
     # hint: for best results, you might need to try more values for learning rate and regularization strength 
     # than provided initially
+    hp_to_accuracy = {} # hyperparameters to accuracy
+    for lr_i in learning_rates:
+        for reg_i in reg_strengths:
+            classifier_i = linear_classifer.LinearSoftmaxClassifier()
+            classifier_i.fit(train_X, train_y, batch_size=_batch_size, learning_rate=lr_i, reg=reg_i, epochs=num_epochs)
+            pred_i = classifier_i.predict(val_X)
+            accuracy_i = multiclass_accuracy(pred_i, val_y)
+            hp_to_accuracy[(lr_i, reg_i)] = accuracy_i
+            if best_val_accuracy is None or accuracy_i > best_val_accuracy:
+                best_val_accuracy = accuracy_i
+                best_classifier = classifier_i
+    return best_classifier, best_val_accuracy, hp_to_accuracy
+
+
+@app.cell
+def _(best_classifier, best_val_accuracy, hp_to_accuracy):
     print('best validation accuracy achieved: %f' % best_val_accuracy)
-    return (best_classifier,)
+    hp_to_accuracy, best_classifier
+    return
 
 
 @app.cell(hide_code=True)
@@ -403,9 +439,12 @@ def _(mo):
 
 @app.cell
 def _(best_classifier, multiclass_accuracy, test_X, test_y):
-    test_pred = best_classifier.predict(test_X)
-    test_accuracy = multiclass_accuracy(test_pred, test_y)
-    print('Linear softmax classifier test set accuracy: %f' % (test_accuracy, ))
+    if best_classifier is not None:
+        test_pred = best_classifier.predict(test_X)
+        test_accuracy = multiclass_accuracy(test_pred, test_y)
+        print('Linear softmax classifier test set accuracy: %f' % (test_accuracy, ))
+    else:
+        print("the variable `best_classifier` must not be None")
     return
 
 
