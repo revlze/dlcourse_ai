@@ -91,8 +91,9 @@ def l2_regularization(W, reg_strength):
       loss, single value - l2 regularization loss
       gradient, np.array same shape as W - gradient of weight by l2 loss
     '''
-    loss = reg_strength * np.linalg.norm(W, ord='fro') ** 2 
+    loss = reg_strength * np.linalg.norm(W[:-1,], ord='fro') ** 2 
     grad = 2 * reg_strength * W
+    grad[-1,] = 0
     return loss, grad
     
 

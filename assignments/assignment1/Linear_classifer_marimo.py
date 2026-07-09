@@ -404,6 +404,7 @@ def _(linear_classifer, multiclass_accuracy, train_X, train_y, val_X, val_y):
     learning_rates = [1e-2, 1e-3, 1e-4, 1e-05, 1e-06]
     reg_strengths = [1e-3, 1e-4, 1e-05, 1e-06]
     best_classifier = None
+    good_classifiers = {}
     best_val_accuracy = None
     # TODO use validation set to find the best hyperparameters
     # hint: for best results, you might need to try more values for learning rate and regularization strength 
@@ -419,7 +420,9 @@ def _(linear_classifer, multiclass_accuracy, train_X, train_y, val_X, val_y):
             if best_val_accuracy is None or accuracy_i > best_val_accuracy:
                 best_val_accuracy = accuracy_i
                 best_classifier = classifier_i
-    return best_classifier, best_val_accuracy, hp_to_accuracy
+            if accuracy_i >= 0.2:
+                good_classifiers[classifier_i] = accuracy_i
+    return best_classifier, best_val_accuracy, good_classifiers, hp_to_accuracy
 
 
 @app.cell
@@ -438,13 +441,18 @@ def _(mo):
 
 
 @app.cell
-def _(best_classifier, multiclass_accuracy, test_X, test_y):
+def _(best_classifier, good_classifiers, multiclass_accuracy, test_X, test_y):
     if best_classifier is not None:
         test_pred = best_classifier.predict(test_X)
         test_accuracy = multiclass_accuracy(test_pred, test_y)
         print('Linear softmax classifier test set accuracy: %f' % (test_accuracy, ))
     else:
         print("the variable `best_classifier` must not be None")
+
+    for good_i in good_classifiers:
+        test_pred = good_i.predict(test_X)
+        test_accuracy = multiclass_accuracy(test_pred, test_y)
+        print(f'Linear softmax classifier test set accuracy: {test_accuracy}, validation accuracy = {good_classifiers[good_i]}')
     return
 
 

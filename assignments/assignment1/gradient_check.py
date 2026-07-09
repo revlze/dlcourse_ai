@@ -23,7 +23,7 @@ def check_gradient(f, x, delta=1e-5, tol = 1e-4):
     fx, analytic_grad = f(x)
     assert np.all(np.isclose(orig_x, x, tol)), "Functions shouldn't modify input variables"
 
-    assert analytic_grad.shape == x.shape
+    assert analytic_grad.shape == x.shape, f"analytic_grad.shape = {analytic_grad.shape}, x.shape = {x.shape}"
     analytic_grad = analytic_grad.copy()
 
     # We will go through every dimension of x and compute numeric
@@ -46,7 +46,3 @@ def check_gradient(f, x, delta=1e-5, tol = 1e-4):
 
     print("Gradient check passed!")
     return True
-
-        
-
-        
