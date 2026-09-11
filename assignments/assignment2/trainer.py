@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import numpy as np
 from metrics import multiclass_accuracy
+from tqdm import tqdm
 
 
 class Dataset:
@@ -52,28 +53,32 @@ class Trainer:
         self.optimizers = None
 
     def setup_optimizers(self):
-        params = self.model.params()
-        self.optimizers = {}
-        for param_name, param in params.items():
-            self.optimizers[param_name] = deepcopy(self.optim)
+        params = self.model.params() # get params dict
+        self.optimizers = {} # new dict params for optim
+        for param_name, param in params.items(): # gogo through params model dict items
+            self.optimizers[param_name] = deepcopy(self.optim) # for every param creates new SGD item?? idk
 
     def compute_accuracy(self, X, y):
         """
         Computes accuracy on provided data using mini-batches
         """
-        indices = np.arange(X.shape[0])
-        sections = np.arange(self.batch_size, X.shape[0], self.batch_size)
-        batches_indices = np.array_split(indices, sections)
+        indices = np.arange(X.shape[0]) # arrange len featers
+        sections = np.arange(self.batch_size, X.shape[0], self.batch_size) # arrange sections batch
+        batches_indices = np.array_split(indices, sections) # split on sections
 
-        pred = np.zeros_like(y)
+        pred_batch = np.zeros((self.batch_size, 10)) # create zeros arrya for pred
+        y_batch = np.zeros((self.batch_size, 10))
 
+        acc_list = []
         for batch_indices in batches_indices:
             batch_X = X[batch_indices]
             pred_batch = self.model.predict(batch_X)
-            pred[batch_indices] = pred_batch
+            y_batch = y[batch_indices]
 
-        return multiclass_accuracy(pred, y)
+            acc_list.append(multiclass_accuracy(pred_batch, y_batch))
 
+        return np.mean(acc_list)
+    
     def fit(self):
         """
         Trains a model
@@ -88,19 +93,21 @@ class Trainer:
         val_acc_history = []
         
         for epoch in range(self.num_epochs):
-            shuffled_indices = np.arange(num_train)
-            np.random.shuffle(shuffled_indices)
-            sections = np.arange(self.batch_size, num_train, self.batch_size)
-            batches_indices = np.array_split(shuffled_indices, sections)
+            shuffled_indices = np.arange(num_train) # just generate arrange len dataset
+            np.random.shuffle(shuffled_indices) # shuffle
+            sections = np.arange(self.batch_size, num_train, self.batch_size) # generate arrange len dataset with step batch_szie
+            batches_indices = np.array_split(shuffled_indices, sections) # split by indices from sections
 
             batch_losses = []
-
-            for batch_indices in batches_indices:
+            batch_loop = tqdm(batches_indices, leave=False)
+            for batch_indices in batch_loop:
                 # TODO Generate batches based on batch_indices and
                 # use model to generate loss and gradients for all
                 # the params
+                train_X_batch = self.dataset.train_X[batch_indices]
+                train_y_batch = self.dataset.train_y[batch_indices]
+                loss = self.model.compute_loss_and_gradients(train_X_batch, train_y_batch)
 
-                raise Exception("Not implemented!")
 
                 for param_name, param in self.model.params().items():
                     optimizer = self.optimizers[param_name]
@@ -108,9 +115,9 @@ class Trainer:
 
                 batch_losses.append(loss)
 
-            if np.not_equal(self.learning_rate_decay, 1.0):
-                # TODO: Implement learning rate decay
-                raise Exception("Not implemented!")
+            if np.not_equal(self.learning_rate_decay, 1.0): # self.learning_rate_decay != 1.0
+                self.learning_rate *= self.learning_rate_decay
+                
 
             ave_loss = np.mean(batch_losses)
 
@@ -120,9 +127,10 @@ class Trainer:
             val_accuracy = self.compute_accuracy(self.dataset.val_X,
                                                  self.dataset.val_y)
 
-            print("Loss: %f, Train accuracy: %f, val accuracy: %f" %
-                  (batch_losses[-1], train_accuracy, val_accuracy))
-
+            # print("Loss: %f, Train accuracy: %f, val accuracy: %f" %
+                #   (batch_losses[-1], train_accuracy, val_accuracy))
+            batch_loop.set_description("Loss: %f, Train accuracy: %f, val accuracy: %f" %
+                                        (batch_losses[-1], train_accuracy, val_accuracy))
             loss_history.append(ave_loss)
             train_acc_history.append(train_accuracy)
             val_acc_history.append(val_accuracy)
